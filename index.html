@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MBSTU Student Hub</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f3f6fb;color:#222}
+.header{background:linear-gradient(135deg,#1976b5,#125a91);color:#fff;text-align:center;padding:28px 15px}
+.header h1{margin:0;font-size:28px}.header p{margin:10px 0 0}
+.container{max-width:700px;margin:auto;padding:20px}.card{background:#fff;border-radius:18px;padding:20px;margin:15px 0;box-shadow:0 5px 20px #00000012}
+input,textarea,select{width:100%;padding:13px;margin:7px 0 12px;border:1px solid #ddd;border-radius:10px;font-size:15px}
+textarea{min-height:90px;resize:vertical}button{border:0;border-radius:10px;padding:12px 16px;margin:5px 3px;background:#1976b5;color:#fff;font-size:15px;cursor:pointer}
+button:hover{opacity:.9}.secondary{background:#555!important}.danger{background:#d32f2f!important}.success{background:#2e7d32!important}.light{background:#e9eef3!important;color:#222!important}
+.hidden{display:none!important}.menu{display:grid;grid-template-columns:1fr 1fr;gap:12px}.menu button{min-height:65px;font-size:16px}
+.item{border:1px solid #ddd;border-radius:14px;padding:15px;margin:12px 0}.status{display:inline-block;padding:5px 10px;border-radius:20px;font-size:13px;margin-bottom:8px}
+.available{background:#d9f5df;color:#176b2b}.taken{background:#ffe0e0;color:#a40000}.pending{background:#fff0c2;color:#805b00}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+#notificationCount{color:#d32f2f;font-weight:bold}.message{position:fixed;left:15px;right:15px;bottom:15px;background:#222;color:#fff;padding:14px;border-radius:12px;text-align:center;z-index:9999;display:none}
+.message.show{display:block}.small{font-size:13px;color:#666}.loading{margin:100px 20px;text-align:center}.logout{background:#d32f2f}
+a.whatsapp{display:inline-block;background:#25D366;color:#fff;padding:11px 15px;border-radius:10px;text-decoration:none;margin-top:8px}
+hr{border:0;border-top:1px solid #eee;margin:15px 0}.search{margin-top:10px}.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:#eef6ff;border-radius:14px;padding:14px;text-align:center}.stat b{font-size:22px;display:block}
+.admin{border:2px solid #1976b5}.badge{font-size:12px;background:#1976b5;color:#fff;border-radius:20px;padding:5px 9px}
+.confirm-overlay{position:fixed;inset:0;background:rgba(10,25,45,.58);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10000}
+.confirm-overlay.hidden{display:none!important}.confirm-card{width:min(430px,100%);background:#fff;border-radius:24px;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:center}.confirm-icon{font-size:38px;margin-bottom:8px}.confirm-card h3{margin:4px 0 8px;font-size:21px}.confirm-card p{color:#667085;line-height:1.5;margin:0 0 20px}.confirm-actions{display:flex;gap:10px;justify-content:center}.confirm-actions button{min-width:110px}
+</style>
+</head>
+<body>
+
+<div class="header"><h1>🎓 MBSTU Student Hub</h1><p>A Smarter Campus • Students Helping Students</p></div>
+
+<div id="loading" class="container"><div class="card loading"><h2>⏳ Starting MBSTU Student Hub...</h2><p id="loadingText">Connecting securely to Supabase...</p></div></div>
+
+<section id="authSection" class="container hidden">
+<div class="card"><h2>🔐 Login</h2>
+<input id="loginEmail" type="email" placeholder="Gmail ID">
+<input id="loginPassword" type="password" placeholder="Password">
+<button onclick="login()">Login</button><button class="light" onclick="showRegister()">Create New Account</button>
+</div>
+<div id="registerBox" class="card hidden"><h2>📝 Register</h2>
+<input id="registerName" placeholder="Full Name"><input id="registerPhone" placeholder="Phone Number"><input id="registerEmail" type="email" placeholder="Gmail ID">
+<input id="registerPassword" type="password" placeholder="Password">
+<button onclick="register()">Register</button><button class="secondary" onclick="hideRegister()">Back</button>
+</div></section>
+
+<section id="mainSection" class="container hidden">
+<div class="card"><div class="topbar"><div><h2>👋 Welcome</h2><div id="userName"></div><div id="userEmail" class="small"></div></div>
+<button class="logout" onclick="logout()">Logout</button></div><hr>
+<button onclick="showNotifications()">🔔 Notifications <span id="notificationCount"></span></button>
+<button onclick="showProfile()">👤 Profile</button><button id="adminBtn" class="hidden" onclick="showAdmin()">👑 Admin</button>
+</div>
+
+<div id="profileSection" class="card hidden"><div class="topbar"><h2>👤 My Profile</h2><button class="secondary" onclick="closeSections()">Back</button></div>
+<div class="profile-grid"><div class="stat"><b id="profilePosts">0</b>My Posts</div><div class="stat"><b id="profileRequests">0</b>My Requests</div></div>
+<hr><p><b>Name:</b> <span id="profileName"></span></p><p><b>Email:</b> <span id="profileEmail"></span></p><p><b>Phone:</b> <span id="profilePhone"></span></p>
+<input id="editName" placeholder="Enter new name"><button onclick="updateProfile()">💾 Update Name</button></div>
+
+<div class="card"><h2>✨ Campus Services</h2><div class="menu">
+<button onclick="openSection('busSection')">🚌 Bus Ticket</button><button onclick="openSection('lunchSection')">🍛 Lunch Token</button>
+<button onclick="openSection('dinnerSection')">🌙 Dinner Token</button><button onclick="openSection('lostSection')">🔍 Lost & Found</button>
+</div></div>
+
+<div id="busSection" class="card hidden"><div class="topbar"><h2>🚌 Bus Ticket</h2><button class="secondary" onclick="closeSections()">Back</button></div>
+<h3>➕ Add Ticket</h3><select id="busType"><option>Going</option><option>Coming</option></select>
+<input id="busDate" type="date"><input id="busTime" type="time"><input id="busPlace" placeholder="From / To">
+<input id="busNumber" placeholder="Ticket Number"><input id="busWhatsapp" placeholder="WhatsApp Number">
+<button onclick="addBusTicket()">➕ Post Ticket</button><hr><input class="search" id="busSearch" oninput="loadBusTickets()" placeholder="🔎 Ticket Search...">
+<h3>🎫 Available Tickets</h3><div id="busList">Loading...</div><hr><h3>📩 My Requests</h3><div id="myBusRequests">Loading...</div><hr><h3>👤 Requests for My Ticket</h3><div id="busOwnerRequests">Loading...</div></div>
+
+<div id="lunchSection" class="card hidden"><div class="topbar"><h2>🍛 Lunch Token</h2><button class="secondary" onclick="closeSections()">Back</button></div>
+<h3>➕ Add Lunch Token</h3><input id="lunchDate" type="date"><input id="lunchHall" placeholder="Hall"><input id="lunchNumber" placeholder="Token Number"><input id="lunchWhatsapp" placeholder="WhatsApp Number">
+<button onclick="addLunch()">➕ Post Lunch Token</button><hr><input id="lunchSearch" oninput="loadLunch()" placeholder="🔎 Token Search..."><h3>🍛 Available Tokens</h3><div id="lunchList">Loading...</div>
+<hr><h3>📩 My Requests</h3><div id="myLunchRequests">Loading...</div><hr><h3>👤 Requests for My Token</h3><div id="lunchOwnerRequests">Loading...</div></div>
+
+<div id="dinnerSection" class="card hidden"><div class="topbar"><h2>🌙 Dinner Token</h2><button class="secondary" onclick="closeSections()">Back</button></div>
+<h3>➕ Add Dinner Token</h3><input id="dinnerDate" type="date"><input id="dinnerHall" placeholder="Hall"><input id="dinnerNumber" placeholder="Token Number"><input id="dinnerWhatsapp" placeholder="WhatsApp Number">
+<button onclick="addDinner()">➕ Post Dinner Token</button><hr><input id="dinnerSearch" oninput="loadDinner()" placeholder="🔎 Token Search..."><h3>🌙 Tokens</h3><div id="dinnerList">Loading...</div>
+<hr><h3>📩 My Requests</h3><div id="myDinnerRequests">Loading...</div><hr><h3>👤 Requests for My Token</h3><div id="dinnerOwnerRequests">Loading...</div></div>
+
+<div id="lostSection" class="card hidden"><div class="topbar"><h2>🔍 Lost & Found</h2><button class="secondary" onclick="closeSections()">Back</button></div>
+<h3>➕ Create Post</h3><select id="lostType"><option value="Lost">Lost</option><option value="Found">Found</option></select>
+<input id="lostItem" placeholder="Item name"><input id="lostLocation" placeholder="Location"><input id="lostDate" type="date"><textarea id="lostDetails" placeholder="Details"></textarea>
+<input id="lostContact" placeholder="Contact"><input id="lostWhatsapp" placeholder="WhatsApp Number"><button onclick="addLostFound()">➕ Create Post</button><hr>
+<input id="lostSearch" oninput="loadLostFound()" placeholder="🔎 Item / Location Search..."><h3>🔎 Posts</h3><div id="lostList">Loading...</div></div>
+
+<div id="notificationSection" class="card hidden"><div class="topbar"><h2>🔔 Notifications</h2><button class="secondary" onclick="closeSections()">Back</button></div>
+<div id="notificationList">Loading...</div><button class="light" onclick="markAllNotificationsRead()">✓ Mark All as Read</button></div>
+
+<div id="adminSection" class="card admin hidden"><div class="topbar"><h2>👑 Admin Control</h2><button class="secondary" onclick="closeSections()">Back</button></div>
+<p class="small">Admin can manage posts, tokens, requests, users, and notifications.</p>
+<h3>📊 Overview</h3><div id="adminStats"></div>
+<hr><h3>🎫 Bus Tickets</h3><div id="adminTickets"></div>
+<hr><h3>🍛 Lunch Tokens</h3><div id="adminLunch"></div>
+<hr><h3>🌙 Dinner Tokens</h3><div id="adminDinner"></div>
+<hr><h3>🔍 Lost & Found</h3><div id="adminLost"></div>
+<hr><h3>📩 Requests</h3><div id="adminRequests"></div>
+<hr><h3>👥 Users / Profiles</h3><div id="adminUsers"></div><hr><h3>🔔 Notifications</h3><div id="adminNotifications"></div>
+<hr><button class="danger" onclick="deleteAllAdminData()">🗑️ Delete All Posts / Requests / Notifications</button></div>
+</section>
+
+<div id="messageBox" class="message"></div>
+<div id="confirmOverlay" class="confirm-overlay hidden">
+  <div class="confirm-card">
+    <div class="confirm-icon">⚠️</div>
+    <h3 id="confirmTitle">Confirm Action</h3>
+    <p id="confirmText">Are you sure?</p>
+    <div class="confirm-actions">
+      <button class="light" onclick="resolveConfirm(false)">Cancel</button>
+      <button class="danger" onclick="resolveConfirm(true)">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL="https://swpakrdulvejkxzglcvo.supabase.co";
+const SUPABASE_KEY="sb_publishable_NqF1SUUMHC4uFcg2Q10y9g_Icts50B-";
+
+/* Admin email */
+const ADMIN_EMAIL="abumotaleb45@gmail.com";
+
+let supabaseClient=null,currentUser=null;
+
+async function startApp(){
+ try{
+  if(!window.supabase||typeof window.supabase.createClient!=="function") throw new Error("Supabase library failed to load. Please check your internet connection.");
+  supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+  document.getElementById("loading").classList.add("hidden");
+  document.getElementById("authSection").classList.remove("hidden");
+  const {data,error}=await supabaseClient.auth.getSession();
+  if(error)throw error;
+  if(data.session){currentUser=data.session.user;if(await ensureProfileAndCheckSuspended())openMain();}
+ }catch(e){document.getElementById("loadingText").textContent="❌ "+e.message;console.error(e);}
+}
+
+function showRegister(){document.getElementById("registerBox").classList.remove("hidden")}
+function hideRegister(){document.getElementById("registerBox").classList.add("hidden")}
+
+async function register(){
+ const name=document.getElementById("registerName").value.trim(),phone=document.getElementById("registerPhone").value.trim(),email=document.getElementById("registerEmail").value.trim(),password=document.getElementById("registerPassword").value;
+ if(!name||!phone||!email||!password)return showMessage("Please complete all required fields.");
+ if(password.length<6)return showMessage("Password must be at least 6 characters.");
+ const {error}=await supabaseClient.auth.signUp({email,password,options:{data:{name,phone}}});
+ if(error)return showMessage(error.message);
+ showMessage("Account created. Please check your Gmail if email confirmation is enabled.");hideRegister();
+}
+
+async function login(){
+ const email=document.getElementById("loginEmail").value.trim(),password=document.getElementById("loginPassword").value;
+ if(!email||!password)return showMessage("Enter your email and password.");
+ const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+ if(error)return showMessage(error.message);currentUser=data.user;if(await ensureProfileAndCheckSuspended())openMain();
+}
+async function logout(){await supabaseClient.auth.signOut();currentUser=null;location.reload()}
+async function ensureProfileAndCheckSuspended(){
+ const u=currentUser;if(!u)return false;
+ const name=u.user_metadata?.name||"Student",phone=u.user_metadata?.phone||"";
+ const {data,error}=await supabaseClient.from("profiles").upsert({id:u.id,name,email:u.email||"",phone},{onConflict:"id"}).select("status").single();
+ if(error){console.error(error);return true;}
+ if(data?.status==="suspended" && (u.email||"").toLowerCase()!==ADMIN_EMAIL.toLowerCase()){
+   await supabaseClient.auth.signOut();currentUser=null;showMessage("This account has been suspended by the administrator.");document.getElementById("mainSection").classList.add("hidden");document.getElementById("authSection").classList.remove("hidden");return false;
+ }
+ return true;
+}
+
+function openMain(){
+ document.getElementById("authSection").classList.add("hidden");document.getElementById("mainSection").classList.remove("hidden");
+ const name=currentUser?.user_metadata?.name||"Student";
+ document.getElementById("userName").textContent=name;document.getElementById("userEmail").textContent=currentUser?.email||"";
+ document.getElementById("profilePhone").textContent=currentUser?.user_metadata?.phone||"";
+ if(currentUser?.email?.toLowerCase()===ADMIN_EMAIL.toLowerCase())document.getElementById("adminBtn").classList.remove("hidden");
+ closeSections();updateNotificationCount();
+}
+function closeSections(){["busSection","lunchSection","dinnerSection","lostSection","notificationSection","profileSection","adminSection"].forEach(id=>document.getElementById(id).classList.add("hidden"))}
+async function openSection(id){closeSections();document.getElementById(id).classList.remove("hidden");if(id==="busSection"){loadBusTickets();loadBusRequests()}if(id==="lunchSection"){loadLunch();loadTokenRequests("lunch")}if(id==="dinnerSection"){loadDinner();loadTokenRequests("dinner")}if(id==="lostSection")loadLostFound()}
+
+async function addBusTicket(){
+ const o={type:busType.value,date:busDate.value,time:busTime.value,place:busPlace.value.trim(),number:busNumber.value.trim(),whatsapp:busWhatsapp.value.trim(),user_id:currentUser.id,status:"available"};
+ if(Object.values(o).some(x=>!x))return showMessage("Please complete all required fields.");
+ const {error}=await supabaseClient.from("tickets").insert(o);if(error)return showMessage(error.message);showMessage("Ticket posted successfully.");["busPlace","busNumber","busWhatsapp"].forEach(x=>document.getElementById(x).value="");loadBusTickets();
+}
+async function loadBusTickets(){
+ const box=document.getElementById("busList"),q=(document.getElementById("busSearch")?.value||"").toLowerCase();box.innerHTML="Loading...";
+ const {data,error}=await supabaseClient.from("tickets").select("*").order("created_at",{ascending:false});if(error)return box.innerHTML="❌ "+esc(error.message);
+ const rows=(data||[]).filter(t=>`${t.type} ${t.date} ${t.time} ${t.place} ${t.number}`.toLowerCase().includes(q));
+ box.innerHTML=rows.length?rows.map(t=>{const own=t.user_id===currentUser.id,taken=t.status==="taken";return `<div class="item"><span class="status ${taken?"taken":"available"}">${taken?"Taken":"Available"}</span><p><b>${esc(t.type)}</b> • ${esc(t.date)} • ${esc(t.time)}</p><p>📍 ${esc(t.place)} | 🎫 ${esc(t.number)}</p><p class="small">🕒 Posted: ${formatPostTime(t.created_at)}</p>${!own&&!taken?`<button onclick="requestBus(${t.id})">Request This</button>`:""}${own?`<button class="danger" onclick="deleteOwnPost('tickets',${t.id})">🗑️ Delete My Post</button><button class="light" onclick="loadBusRequests()">📩 Requests</button>`:""}</div>`}).join(""):"<p>No tickets available.</p>";
+}
+async function getProfilePhone(uid){
+ const {data}=await supabaseClient.from("profiles").select("phone").eq("id",uid).maybeSingle();
+ return data?.phone||"";
+}
+function waLink(n){return n?`<a class="whatsapp" href="${wa(n)}" target="_blank">💬 WhatsApp</a>`:`<span class="small">📱 WhatsApp number not provided</span>`}
+async function requestBus(id){
+ const {data:t,error}=await supabaseClient.from("tickets").select("*").eq("id",id).single();if(error)return showMessage(error.message);
+ if(t.status!=="available")return showMessage("This ticket has already been taken.");if(t.user_id===currentUser.id)return showMessage("You cannot request your own ticket.");
+ const {data:ex}=await supabaseClient.from("ticket_requests").select("id").eq("ticket_id",id).eq("requester_id",currentUser.id).maybeSingle();if(ex)return showMessage("You have already requested this item.");
+ const requesterWhatsapp=await getProfilePhone(currentUser.id); const ownerWhatsapp=t.whatsapp||await getProfilePhone(t.user_id); const {error:e}=await supabaseClient.from("ticket_requests").insert({ticket_id:id,requester_email:currentUser.email,requester_id:currentUser.id,owner_id:t.user_id,requester_whatsapp:requesterWhatsapp,owner_whatsapp:ownerWhatsapp,status:"pending"});if(e)return showMessage(e.message);
+ await sendNotification(t.user_id,"🚌 A student has requested your bus ticket.");showMessage("Request sent successfully.");loadBusRequests();
+}
+async function loadBusRequests(){
+ const a=document.getElementById("myBusRequests"),b=document.getElementById("busOwnerRequests");if(!a||!b)return;
+ const {data:mine}=await supabaseClient.from("ticket_requests").select("*").eq("requester_id",currentUser.id).order("created_at",{ascending:false});
+ a.innerHTML=mine?.length?mine.map(r=>`<div class="item"><b>🚌 Bus Ticket Request</b><p>Status: <span class="status pending">${esc(r.status)}</span></p></div>`).join(""):"<p>No requests found.</p>";
+ const {data:own}=await supabaseClient.from("ticket_requests").select("*").eq("owner_id",currentUser.id).eq("status","pending").order("created_at",{ascending:false});
+ b.innerHTML=own?.length?own.map(r=>`<div class="item"><p><b>Requester:</b> ${esc(r.requester_email)}</p><p>📱 Buyer WhatsApp: ${esc(r.requester_whatsapp||"-")}</p>${waLink(r.requester_whatsapp)}<p>📱 Seller WhatsApp: ${esc(r.owner_whatsapp||"-")}</p>${waLink(r.owner_whatsapp)}<button class="success" onclick="acceptBus(${r.id},${r.ticket_id})">✓ Accept</button><button class="danger" onclick="rejectBus(${r.id})">✕ Reject</button></div>`).join(""):"<p>No pending requests.</p>";
+}
+async function acceptBus(rid,tid){
+ const {data:r,error}=await supabaseClient.from("ticket_requests").select("*").eq("id",rid).single();if(error)return showMessage(error.message);
+ const {error:e}=await supabaseClient.from("tickets").update({status:"taken"}).eq("id",tid).eq("user_id",currentUser.id).eq("status","available");if(e)return showMessage(e.message);
+ await supabaseClient.from("ticket_requests").update({status:"accepted"}).eq("id",rid);await supabaseClient.from("ticket_requests").update({status:"rejected"}).eq("ticket_id",tid).eq("status","pending").neq("id",rid);
+ await sendNotification(r.requester_id,"🚌 Your bus ticket request has been accepted.");showMessage("Request accepted successfully.");loadBusTickets();loadBusRequests();
+}
+async function rejectBus(id){const {data:r}=await supabaseClient.from("ticket_requests").select("*").eq("id",id).single();await supabaseClient.from("ticket_requests").update({status:"rejected"}).eq("id",id);if(r)await sendNotification(r.requester_id,"🚌 Your bus ticket request has been rejected.");showMessage("Request rejected.");loadBusRequests()}
+
+async function addLunch(){const o={date:lunchDate.value,hall:lunchHall.value.trim(),number:lunchNumber.value.trim(),whatsapp:lunchWhatsapp.value.trim(),user_id:currentUser.id,status:"available"};if(Object.values(o).some(x=>!x))return showMessage("Please complete all required fields.");const {error}=await supabaseClient.from("lunch_tokens").insert(o);if(error)return showMessage(error.message);showMessage("Lunch token posted successfully.");loadLunch()}
+async function loadLunch(){await loadTokens("lunch")}
+async function addDinner(){const o={date:dinnerDate.value,hall:dinnerHall.value.trim(),number:dinnerNumber.value.trim(),whatsapp:dinnerWhatsapp.value.trim(),user_id:currentUser.id,status:"available"};if(Object.values(o).some(x=>!x))return showMessage("Please complete all required fields.");const {error}=await supabaseClient.from("dinner_tokens").insert(o);if(error)return showMessage(error.message);showMessage("Dinner token posted successfully.");loadDinner()}
+async function loadDinner(){await loadTokens("dinner")}
+async function loadTokens(type){
+ const table=type==="lunch"?"lunch_tokens":"dinner_tokens",box=document.getElementById(type==="lunch"?"lunchList":"dinnerList"),q=(document.getElementById(type==="lunch"?"lunchSearch":"dinnerSearch")?.value||"").toLowerCase();box.innerHTML="Loading...";
+ const {data,error}=await supabaseClient.from(table).select("*").order("created_at",{ascending:false});if(error)return box.innerHTML="❌ "+esc(error.message);
+ const rows=(data||[]).filter(t=>`${t.date} ${t.hall} ${t.number}`.toLowerCase().includes(q));
+ box.innerHTML=rows.length?rows.map(t=>{const own=t.user_id===currentUser.id,taken=t.status==="taken";return `<div class="item"><span class="status ${taken?"taken":"available"}">${taken?"Taken":"Available"}</span><p>📅 ${esc(t.date)} | 🏠 ${esc(t.hall)} | 🎫 ${esc(t.number)}</p><p class="small">🕒 Posted: ${formatPostTime(t.created_at)}</p>${!own&&!taken?`<button onclick="requestToken('${type}',${t.id})">Request This</button>`:""}${own?`<button class="danger" onclick="deleteOwnPost('${table}',${t.id})">🗑️ Delete My Post</button><button class="light" onclick="loadTokenRequests('${type}')">📩 Requests</button>`:""}</div>`}).join(""):"<p>No tokens available.</p>";
+}
+async function requestToken(type,id){
+ const table=type==="lunch"?"lunch_tokens":"dinner_tokens";const {data:t,error}=await supabaseClient.from(table).select("*").eq("id",id).single();if(error)return showMessage(error.message);if(t.status!=="available")return showMessage("This token has already been taken.");if(t.user_id===currentUser.id)return showMessage("You cannot request your own token.");
+ const {data:ex}=await supabaseClient.from("token_requests").select("id").eq("token_type",type).eq("token_id",id).eq("requester_id",currentUser.id).maybeSingle();if(ex)return showMessage("You have already requested this item.");
+ const requesterWhatsapp=await getProfilePhone(currentUser.id); const ownerWhatsapp=t.whatsapp||await getProfilePhone(t.user_id); const {error:e}=await supabaseClient.from("token_requests").insert({token_type:type,token_id:id,requester_id:currentUser.id,requester_email:currentUser.email,owner_id:t.user_id,requester_whatsapp:requesterWhatsapp,owner_whatsapp:ownerWhatsapp,status:"pending"});if(e)return showMessage(e.message);
+ await sendNotification(t.user_id,"🍛 আপনার Token-এর জন্য একজন Student Request করেছে।");showMessage("Request sent successfully.");loadTokenRequests(type);
+}
+async function loadTokenRequests(type){
+ const mine=document.getElementById(type==="lunch"?"myLunchRequests":"myDinnerRequests"),own=document.getElementById(type==="lunch"?"lunchOwnerRequests":"dinnerOwnerRequests");
+ const {data:m}=await supabaseClient.from("token_requests").select("*").eq("token_type",type).eq("requester_id",currentUser.id).order("created_at",{ascending:false});mine.innerHTML=m?.length?m.map(r=>`<div class="item"><b>${type} Request</b><p>Status: ${esc(r.status)}</p><p>📱 Seller WhatsApp: ${esc(r.owner_whatsapp||"-")}</p>${waLink(r.owner_whatsapp)}<p>📱 Your WhatsApp: ${esc(r.requester_whatsapp||"-")}</p>${waLink(r.requester_whatsapp)}</div>`).join(""):"<p>No requests found.</p>";
+ const {data:o}=await supabaseClient.from("token_requests").select("*").eq("token_type",type).eq("owner_id",currentUser.id).eq("status","pending").order("created_at",{ascending:false});own.innerHTML=o?.length?o.map(r=>`<div class="item"><p><b>Requester:</b> ${esc(r.requester_email)}</p><p>📱 Buyer WhatsApp: ${esc(r.requester_whatsapp||"-")}</p>${waLink(r.requester_whatsapp)}<p>📱 Seller WhatsApp: ${esc(r.owner_whatsapp||"-")}</p>${waLink(r.owner_whatsapp)}<button class="success" onclick="acceptToken(${r.id},'${type}',${r.token_id})">✓ Accept</button><button class="danger" onclick="rejectToken(${r.id},'${type}')">✕ Reject</button></div>`).join(""):"<p>No pending requests.</p>";
+}
+async function acceptToken(rid,type,tid){
+ const table=type==="lunch"?"lunch_tokens":"dinner_tokens";const {data:r,error}=await supabaseClient.from("token_requests").select("*").eq("id",rid).single();if(error)return showMessage(error.message);
+ const {error:e}=await supabaseClient.from(table).update({status:"taken"}).eq("id",tid).eq("user_id",currentUser.id).eq("status","available");if(e)return showMessage(e.message);
+ await supabaseClient.from("token_requests").update({status:"accepted"}).eq("id",rid);await supabaseClient.from("token_requests").update({status:"rejected"}).eq("token_type",type).eq("token_id",tid).eq("status","pending").neq("id",rid);await sendNotification(r.requester_id,"🍛 Your lunch token request has been accepted.");showMessage("Request accepted successfully.");type==="lunch"?loadLunch():loadDinner();loadTokenRequests(type);
+}
+async function rejectToken(id,type){const {data:r}=await supabaseClient.from("token_requests").select("*").eq("id",id).single();await supabaseClient.from("token_requests").update({status:"rejected"}).eq("id",id);if(r)await sendNotification(r.requester_id,"🌙 Your token request has been rejected.");showMessage("Request rejected.");loadTokenRequests(type)}
+
+async function addLostFound(){
+ const o={type:lostType.value,item:lostItem.value.trim(),location:lostLocation.value.trim(),date:lostDate.value,details:lostDetails.value.trim(),contact:lostContact.value.trim(),whatsapp:lostWhatsapp.value.trim(),user_id:currentUser.id};
+ if(Object.values(o).some(x=>!x))return showMessage("Please complete all required fields.");const {error}=await supabaseClient.from("lost_found").insert(o);if(error)return showMessage(error.message);showMessage("Lost & Found post created successfully.");loadLostFound();
+}
+async function loadLostFound(){
+ const box=document.getElementById("lostList"),q=(document.getElementById("lostSearch")?.value||"").toLowerCase();box.innerHTML="Loading...";const {data,error}=await supabaseClient.from("lost_found").select("*").order("created_at",{ascending:false});if(error)return box.innerHTML="❌ "+esc(error.message);
+ const rows=(data||[]).filter(x=>`${x.item} ${x.location} ${x.details}`.toLowerCase().includes(q));box.innerHTML=rows.length?rows.map(x=>{const own=x.user_id===currentUser.id;return `<div class="item"><span class="status ${x.type==="Lost"?"taken":"available"}">${esc(x.type)}</span><h3>${esc(x.item)}</h3><p>📍 ${esc(x.location)} | 📅 ${esc(x.date)}</p><p>🕒 Posted: ${formatPostTime(x.created_at)}</p><p>${esc(x.details)}</p><p>☎ ${esc(x.contact)}</p><a class="whatsapp" href="${wa(x.whatsapp)}" target="_blank">💬 WhatsApp</a>${own?`<br><button class="danger" onclick="deleteOwnPost('lost_found',${x.id})">🗑️ Delete My Post</button>`:""}</div>`}).join(""):"<p>No posts found.</p>";
+}
+
+async function sendNotification(userId,message){if(!userId)return;const {error}=await supabaseClient.from("notifications").insert({user_id:userId,message,is_read:false});if(error)console.log(error)}
+async function updateNotificationCount(){if(!currentUser)return;const {count}=await supabaseClient.from("notifications").select("id",{count:"exact",head:true}).eq("user_id",currentUser.id).eq("is_read",false);document.getElementById("notificationCount").textContent=count>0?`(${count})`:""}
+async function showNotifications(){closeSections();document.getElementById("notificationSection").classList.remove("hidden");const box=document.getElementById("notificationList");const {data,error}=await supabaseClient.from("notifications").select("*").eq("user_id",currentUser.id).order("created_at",{ascending:false});if(error)return box.innerHTML="❌ "+esc(error.message);box.innerHTML=data?.length?data.map(n=>`<div class="item"><p>${esc(n.message)}</p><div class="small">${new Date(n.created_at).toLocaleString()}</div>${!n.is_read?`<button class="light" onclick="markNotificationRead(${n.id})">✓ Read</button>`:"✓ Read"}</div>`).join(""):"<p>No notifications found.</p>"}
+async function markNotificationRead(id){await supabaseClient.from("notifications").update({is_read:true}).eq("id",id).eq("user_id",currentUser.id);showNotifications();updateNotificationCount()}
+async function markAllNotificationsRead(){await supabaseClient.from("notifications").update({is_read:true}).eq("user_id",currentUser.id);showNotifications();updateNotificationCount()}
+
+async function showProfile(){
+ closeSections();document.getElementById("profileSection").classList.remove("hidden");document.getElementById("profileName").textContent=currentUser.user_metadata?.name||"Student";document.getElementById("profileEmail").textContent=currentUser.email||"";document.getElementById("profilePhone").textContent=currentUser.user_metadata?.phone||"";document.getElementById("editName").value=currentUser.user_metadata?.name||"";
+ const a=await supabaseClient.from("tickets").select("id",{count:"exact",head:true}).eq("user_id",currentUser.id),b=await supabaseClient.from("ticket_requests").select("id",{count:"exact",head:true}).eq("requester_id",currentUser.id),c=await supabaseClient.from("lunch_tokens").select("id",{count:"exact",head:true}).eq("user_id",currentUser.id),d=await supabaseClient.from("dinner_tokens").select("id",{count:"exact",head:true}).eq("user_id",currentUser.id),e=await supabaseClient.from("lost_found").select("id",{count:"exact",head:true}).eq("user_id",currentUser.id);
+ document.getElementById("profilePosts").textContent=(a.count||0)+(c.count||0)+(d.count||0)+(e.count||0);document.getElementById("profileRequests").textContent=b.count||0;
+}
+async function updateProfile(){const name=document.getElementById("editName").value.trim();if(!name)return showMessage("Please enter a name.");const {error}=await supabaseClient.auth.updateUser({data:{name}});if(error)return showMessage(error.message);currentUser.user_metadata.name=name;await supabaseClient.from("profiles").update({name}).eq("id",currentUser.id);document.getElementById("userName").textContent=name;showProfile();showMessage("Profile updated successfully.")}
+
+async function adminCheck(){
+ return !!(currentUser?.email && ADMIN_EMAIL && currentUser.email.toLowerCase()===ADMIN_EMAIL.toLowerCase());
+}
+async function adminDelete(table,id){
+ if(!(await adminCheck()))return showMessage("Admin access denied.");
+ if(!(await confirmAction("Delete Item", "Are you sure you want to delete this item?")))return;
+ const {error}=await supabaseClient.from(table).delete().eq("id",id);
+ if(error)return showMessage(error.message);
+ showMessage("Deleted successfully.");showAdmin();
+}
+async function adminSuspendUser(id,suspend){
+ if(!(await adminCheck()))return showMessage("Admin access denied.");
+ const status=suspend?"suspended":"active";
+ const {error}=await supabaseClient.from("profiles").update({status}).eq("id",id);
+ if(error)return showMessage(error.message);
+ showMessage(suspend?"User suspended successfully.":"User unsuspended successfully.");showAdmin();
+}
+async function adminViewUserHistory(id){
+ if(!(await adminCheck()))return showMessage("Admin access denied.");
+ const p=await supabaseClient.from("profiles").select("*").eq("id",id).single();
+ const [a,b,c,d,e]=await Promise.all([
+  supabaseClient.from("tickets").select("*").eq("user_id",id).order("created_at",{ascending:false}),
+  supabaseClient.from("lunch_tokens").select("*").eq("user_id",id).order("created_at",{ascending:false}),
+  supabaseClient.from("dinner_tokens").select("*").eq("user_id",id).order("created_at",{ascending:false}),
+  supabaseClient.from("lost_found").select("*").eq("user_id",id).order("created_at",{ascending:false}),
+  supabaseClient.from("ticket_requests").select("*").eq("requester_id",id).order("created_at",{ascending:false})
+ ]);
+ const box=document.getElementById("adminUsers");
+ box.innerHTML=`<div class="item"><h3>👤 ${esc(p.data?.name||"Student")}</h3><p>📧 ${esc(p.data?.email||"")}</p><p>📱 ${esc(p.data?.phone||"Not added")}</p><p>🔐 Status: <b>${esc(p.data?.status||"active")}</b></p><hr><b>🚌 Bus: ${(a.data||[]).length}</b> | <b>🍛 Lunch: ${(b.data||[]).length}</b> | <b>🌙 Dinner: ${(c.data||[]).length}</b> | <b>🔍 Lost/Found: ${(d.data||[]).length}</b> | <b>📩 Requests: ${(e.data||[]).length}</b></div>`;
+}
+async function adminSetStatus(table,id,status){
+ if(!(await adminCheck()))return showMessage("Admin access denied.");
+ const {error}=await supabaseClient.from(table).update({status}).eq("id",id);
+ if(error)return showMessage(error.message);
+ showMessage("Status updated successfully.");showAdmin();
+}
+async function deleteAllAdminData(){
+ if(!(await adminCheck()))return showMessage("Admin access denied.");
+ if(!(await confirmAction("Delete All Data", "Are you sure you want to permanently delete all posts, requests, and notifications?")))return;
+ const ops=[
+  ["ticket_requests","id"],["token_requests","id"],["notifications","id"],
+  ["tickets","id"],["lunch_tokens","id"],["dinner_tokens","id"],["lost_found","id"]
+ ];
+ for(const [table,col] of ops){const {error}=await supabaseClient.from(table).delete().not(col,"is",null);if(error)return showMessage(table+": "+error.message);}
+ showMessage("All admin data has been deleted.");showAdmin();
+}
+async function showAdmin(){
+ if(!(await adminCheck()))return showMessage("Admin access denied.");
+ closeSections();document.getElementById("adminSection").classList.remove("hidden");
+ const [t,lu,di,l,n,b,tr]=await Promise.all([
+  supabaseClient.from("tickets").select("id",{count:"exact",head:true}),
+  supabaseClient.from("lunch_tokens").select("id",{count:"exact",head:true}),
+  supabaseClient.from("dinner_tokens").select("id",{count:"exact",head:true}),
+  supabaseClient.from("lost_found").select("id",{count:"exact",head:true}),
+  supabaseClient.from("notifications").select("id",{count:"exact",head:true}),
+  supabaseClient.from("ticket_requests").select("id",{count:"exact",head:true}),
+  supabaseClient.from("token_requests").select("id",{count:"exact",head:true})
+ ]);
+ document.getElementById("adminStats").innerHTML=`<div class="profile-grid"><div class="stat"><b>${t.count||0}</b>Bus</div><div class="stat"><b>${lu.count||0}</b>Lunch</div><div class="stat"><b>${di.count||0}</b>Dinner</div><div class="stat"><b>${l.count||0}</b>Lost/Found</div><div class="stat"><b>${(b.count||0)+(tr.count||0)}</b>Requests</div><div class="stat"><b>${n.count||0}</b>Notifications</div></div>`;
+ const {data:ts}=await supabaseClient.from("tickets").select("*").order("created_at",{ascending:false}).limit(30);document.getElementById("adminTickets").innerHTML=ts?.length?ts.map(x=>`<div class="item">🚌 <b>${esc(x.type)}</b> | ${esc(x.date)} | ${esc(x.place)} <span class="badge">${esc(x.status)}</span><div class="small">🕒 ${formatPostTime(x.created_at)}</div><button class="light" onclick="adminSetStatus('tickets',${x.id},'available')">Available</button> <button class="danger" onclick="adminDelete('tickets',${x.id})">Delete</button></div>`).join(""):"No tickets available";
+ const {data:lus}=await supabaseClient.from("lunch_tokens").select("*").order("created_at",{ascending:false}).limit(30);document.getElementById("adminLunch").innerHTML=lus?.length?lus.map(x=>`<div class="item">🍛 ${esc(x.date)} | ${esc(x.hall)} | ${esc(x.number)} <span class="badge">${esc(x.status)}</span><div class="small">🕒 ${formatPostTime(x.created_at)}</div><button class="light" onclick="adminSetStatus('lunch_tokens',${x.id},'available')">Available</button> <button class="danger" onclick="adminDelete('lunch_tokens',${x.id})">Delete</button></div>`).join(""):"No lunch tokens available.";
+ const {data:dis}=await supabaseClient.from("dinner_tokens").select("*").order("created_at",{ascending:false}).limit(30);document.getElementById("adminDinner").innerHTML=dis?.length?dis.map(x=>`<div class="item">🌙 ${esc(x.date)} | ${esc(x.hall)} | ${esc(x.number)} <span class="badge">${esc(x.status)}</span><div class="small">🕒 ${formatPostTime(x.created_at)}</div><button class="light" onclick="adminSetStatus('dinner_tokens',${x.id},'available')">Available</button> <button class="danger" onclick="adminDelete('dinner_tokens',${x.id})">Delete</button></div>`).join(""):"No dinner tokens available.";
+ const {data:ls}=await supabaseClient.from("lost_found").select("*").order("created_at",{ascending:false}).limit(30);document.getElementById("adminLost").innerHTML=ls?.length?ls.map(x=>`<div class="item">🔎 ${esc(x.type)} — <b>${esc(x.item)}</b> — ${esc(x.location)}<div class="small">🕒 ${formatPostTime(x.created_at)}</div><button class="danger" onclick="adminDelete('lost_found',${x.id})">Delete</button></div>`).join(""):"No posts found";
+ const {data:rs}=await supabaseClient.from("ticket_requests").select("*").order("created_at",{ascending:false}).limit(30);const {data:trs}=await supabaseClient.from("token_requests").select("*").order("created_at",{ascending:false}).limit(30);document.getElementById("adminRequests").innerHTML=[...(rs||[]).map(x=>`<div class="item">🚌 ${esc(x.requester_email)} — ${esc(x.status)}<div class="small">🕒 ${formatPostTime(x.created_at)}</div><button class="danger" onclick="adminDelete('ticket_requests',${x.id})">Delete</button></div>`),...(trs||[]).map(x=>`<div class="item">🍛 ${esc(x.requester_email)} — ${esc(x.token_type)} — ${esc(x.status)}<div class="small">🕒 ${formatPostTime(x.created_at)}</div><button class="danger" onclick="adminDelete('token_requests',${x.id})">Delete</button></div>`)].join("")||"No requests found";
+ const {data:users}=await supabaseClient.from("profiles").select("*").order("created_at",{ascending:false});
+ document.getElementById("adminUsers").innerHTML=users?.length?users.map(u=>{const isAdmin=(u.email||"").toLowerCase()===ADMIN_EMAIL.toLowerCase();return `<div class="item"><b>👤 ${esc(u.name||"Student")}</b><p>📧 ${esc(u.email||"")}<br>📱 ${esc(u.phone||"Not added")}<br>🕒 Joined: ${formatPostTime(u.created_at)}</p><span class="badge">${esc(u.status||"active")}</span> <button class="light" onclick="adminViewUserHistory('${u.id}')">📜 History</button> ${!isAdmin?(u.status==="suspended"?`<button class="success" onclick="adminSuspendUser('${u.id}',false)">🔓 Unsuspend</button>`:`<button class="danger" onclick="adminSuspendUser('${u.id}',true)">🚫 Suspend</button>`):`<span class="badge">ADMIN</span>`}</div>`}).join(""):"No user profiles found.";
+
+ const {data:ns}=await supabaseClient.from("notifications").select("*").order("created_at",{ascending:false}).limit(30);document.getElementById("adminNotifications").innerHTML=ns?.length?ns.map(x=>`<div class="item">🔔 ${esc(x.message)}<div class="small">🕒 ${formatPostTime(x.created_at)}</div><button class="danger" onclick="adminDelete('notifications',${x.id})">Delete</button></div>`).join(""):"No notifications found";
+}
+
+function formatPostTime(v){if(!v)return "Time unavailable";return new Date(v).toLocaleString("en-US",{dateStyle:"medium",timeStyle:"short"})}
+async function deleteOwnPost(table,id){
+ if(!(await confirmAction("Delete Post", "Are you sure you want to delete your post?")))return;
+ const {error}=await supabaseClient.from(table).delete().eq("id",id).eq("user_id",currentUser.id);
+ if(error)return showMessage(error.message);
+ showMessage("Post deleted successfully.");
+ if(table==="tickets")loadBusTickets();
+ else if(table==="lunch_tokens")loadLunch();
+ else if(table==="dinner_tokens")loadDinner();
+ else if(table==="lost_found")loadLostFound();
+}
+function postTime(v){
+  if(!v) return "";
+  try{return new Date(v).toLocaleString("en-BD",{dateStyle:"medium",timeStyle:"short"});}catch(e){return v;}
+}
+async function userDelete(table,id){
+  if(!(await confirmAction("Delete Post", "Are you sure you want to delete your post?"))) return;
+  const {error}=await supabaseClient.from(table).delete().eq("id",id);
+  if(error)return showMessage(error.message);
+  showMessage("Post deleted successfully.");
+  if(table==="tickets")loadBusTickets();
+  else if(table==="lunch_tokens")loadLunch();
+  else if(table==="dinner_tokens")loadDinner();
+  else if(table==="lost_found")loadLostFound();
+}
+let confirmResolver=null;
+function confirmAction(title,text){return new Promise(resolve=>{confirmResolver=resolve;document.getElementById("confirmTitle").textContent=title;document.getElementById("confirmText").textContent=text;document.getElementById("confirmOverlay").classList.remove("hidden");});}
+function resolveConfirm(value){document.getElementById("confirmOverlay").classList.add("hidden");if(confirmResolver){const r=confirmResolver;confirmResolver=null;r(value);}}
+function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
+function wa(n){let x=String(n||"").replace(/\D/g,"");if(x.startsWith("01"))x="880"+x.slice(1);return "https://wa.me/"+x}
+function showMessage(t){const b=document.getElementById("messageBox");b.textContent=t;b.classList.add("show");setTimeout(()=>b.classList.remove("show"),3000)}
+startApp();
+</script>
+</body>
+</html>
